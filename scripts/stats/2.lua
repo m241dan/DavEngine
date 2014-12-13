@@ -3,4 +3,3 @@ end
 
 function onStatLose( mob, amount )
 end
-

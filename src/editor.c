@@ -1531,7 +1531,7 @@ const char *return_instance_specs( ENTITY_INSTANCE *instance, int width )
 
    spec_strings = AllocList();
 
-   mud_printf( buf, "%s\r\n", print_header( "Stats", "-", width ) );
+   mud_printf( buf, "%s\r\n", print_header( "Specifications", "-", width ) );
 
    for( longest = 0, x = MAX_SPEC; x >= 0; x-- )
    {
@@ -1585,7 +1585,7 @@ const char *return_instance_stats( ENTITY_INSTANCE *instance, int width )
       if( stat == instance->primary_dmg_received_stat )
          continue;
       CREATE( stat_string, char, MAX_BUFFER );
-      mud_printf( stat_string, "%s - P: %d M: %d T: %d ", stat->framework->name, stat->perm_stat, stat->mod_stat, ( stat->perm_stat + stat->mod_stat ) );
+      mud_printf( stat_string, "\"%s\" is %d (P: %d | M: %d) ", stat->framework->name, get_stat_total( stat ), stat->perm_stat, stat->mod_stat );
       if( ( stat_string_len = strlen( stat_string ) ) > longest )
          longest = stat_string_len;
       AttachToList( stat_string, stat_strings );

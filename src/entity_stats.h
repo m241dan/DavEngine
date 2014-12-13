@@ -61,6 +61,9 @@ STAT_INSTANCE  *get_stat_from_instance_by_name( ENTITY_INSTANCE *entity, const c
 
 STAT_FRAMEWORK *get_primary_dmg_stat_from_framework( ENTITY_FRAMEWORK *frame, int *source );
 
+/* utility */
+int get_effective_change( int cap, int floor, int raw, int effective_value, int change );
+
 /* inlines */
 
 /* setters */
@@ -93,7 +96,7 @@ extern inline void add_mod_stat( STAT_INSTANCE *stat, int value );
 extern inline void restore_pool_stats( ENTITY_INSTANCE *instance );
 
 
-void lua_set_stat( STAT_INSTANCE *stat, int change, int effective );
+void lua_set_stat( STAT_INSTANCE *stat, int change );
 FILE *open_s_script( STAT_FRAMEWORK *fstat, const char *permissions );
 bool s_script_exists( STAT_FRAMEWORK *fstat );
 void init_s_script( STAT_FRAMEWORK *fstat, bool force );
