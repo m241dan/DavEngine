@@ -61,6 +61,8 @@ void boot_instance_editor( INCEPTION *olc, ENTITY_INSTANCE *instance );
 void editor_instance_info( D_SOCKET *dsock );
 int editor_instance_prompt( D_SOCKET *dsock, bool commands );
 const char *return_instance_contents_string( ENTITY_INSTANCE *instance, const char *border, int width );
+const char *return_instance_specs( ENTITY_INSTANCE *instance, int width );
+const char *return_instance_stats( ENTITY_INSTANCE *instance, int width );
 const char *return_instance_spec_and_stats( ENTITY_INSTANCE *intance, const char *border, int width );
 
 void instance_load( void *passed, char *arg );

@@ -443,6 +443,8 @@ const char *return_framework_stats( ENTITY_FRAMEWORK *frame, int width )
       stat_from = 0;
       if( ( sframe = get_stat_from_framework_by_id( frame, x, &stat_from ) ) == NULL )
          continue;
+      if( sframe == frame->f_primary_dmg_received_stat )
+         continue;
       CREATE( stat_string, char, MAX_BUFFER );
       mud_printf( stat_string, "%s%s ", sframe->name, stat_from_table[stat_from] );
       if( ( stat_string_len = strlen( stat_string ) ) > longest )
@@ -1403,36 +1405,37 @@ void boot_instance_editor( INCEPTION *olc, ENTITY_INSTANCE *instance )
    init_instance_editor( olc, instance );
    olc->editing_state = STATE_EINSTANCE_EDITOR;
    change_socket_state( olc->account->socket, olc->editing_state );
+   editor_instance_info( olc->account->socket );
+   get_commands( olc->account->socket );
+   text_to_olc( olc, "Type -> /info || /commands for help.\r\n" );
    return;
 }
 
 void editor_instance_info( D_SOCKET *socket )
 {
-
-}
-
-int editor_instance_prompt( D_SOCKET *dsock, bool commands )
-{
-   INCEPTION *olc;
    ENTITY_INSTANCE *instance;
-   BUFFER *buf = buffer_new( MAX_OUTPUT );
-   const char *border = "|";
+   INCEPTION *olc;
    char tempstring[MAX_BUFFER];
+   const char *border = "|";
    int space_after_border;
-   int ret = RET_SUCCESS;
 
-   instance = (ENTITY_INSTANCE *)dsock->account->olc->editing;
-   olc = dsock->account->olc;
-   space_after_border = dsock->account->pagewidth - ( strlen( border ) * 2 );
+   if( !socket->account || !socket->account->olc )
+   {
+      text_to_socket( socket, "You have NULL account or olc...\r\n" );
+      return;
+   }
+   olc = socket->account->olc;
+   if( ( instance = (ENTITY_INSTANCE *)olc->editing ) == NULL )
+   {
+      bug( "%s: not editing anything...", __FUNCTION__ );
+      return;
+   }
 
-   if( !strcmp( instance->tag->created_by, "null" ) )
-      mud_printf( tempstring, "Potential Instance ID: %d", get_potential_id( instance->tag->type ) );
-   else
-      mud_printf( tempstring, "Instance ID: %d", instance->tag->id );
+   space_after_border = socket->account->pagewidth - ( strlen( border ) * 2 );
 
-   mudcat( tempstring, quick_format( "| Framework ID: %d", instance->framework->tag->id ) );
+   mud_printf( tempstring, "Instance ID: %d | Framework ID: %d", instance->tag->id, instance->framework->tag->id );
 
-   text_to_olc( olc, "/%s\\\r\n", print_header( tempstring, "-", dsock->account->pagewidth - 2 ) );
+   text_to_olc( olc, "/%s\\\r\n", print_header( tempstring, "-", socket->account->pagewidth - 2 ) );
    text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " Name(framework)  : %s", instance_name( instance ) ), space_after_border ), border );
    text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " Short(framework) : %s", instance_short_descr( instance ) ), space_after_border ), border );
    text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " Long(framework)  : %s", instance_long_descr( instance ) ), space_after_border ), border );
@@ -1445,31 +1448,45 @@ int editor_instance_prompt( D_SOCKET *dsock, bool commands )
    if( !instance->home )
       text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( " This instace has no home.", space_after_border ), border );
    else
-      text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( "This instance's home is (%d)%s.", instance->home->tag->id, instance_short_descr( instance->home ) ), space_after_border), border );
+      text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " This instance's home is (%d)%s.", instance->home->tag->id, instance_short_descr( instance->home ) ), space_after_border), border );
    text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " Height : %d.", get_height( instance ) ), space_after_border ), border );
    text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " Weight : %d.", get_weight( instance ) ), space_after_border ), border );
    text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " Width  : %d.", get_width( instance ) ), space_after_border ), border );
 
    if( SizeOfList( instance->contents ) > 0 )
-      text_to_olc( olc, "%s", return_instance_contents_string( instance, border, dsock->account->pagewidth ) );
+      text_to_olc( olc, "%s", return_instance_contents_string( instance, border, socket->account->pagewidth ) );
    if( instance->primary_dmg_received_stat )
    {
       text_to_olc( olc, "%s%s%s\r\n", border, print_bar( "-", space_after_border ), border );
       text_to_olc( olc, "%s%s%s\r\n", border, fit_string_to_space( quick_format( " Primary Damage: %s %d/%d",
          instance->primary_dmg_received_stat->framework->name, instance->primary_dmg_received_stat->mod_stat,
          instance->primary_dmg_received_stat->perm_stat ), space_after_border ), border );
+      text_to_olc( olc, "\\%s/\r\n",print_bar( "-", socket->account->pagewidth - 2 ) );
    }
-   text_to_olc( olc, "%s", return_instance_spec_and_stats( instance, border, dsock->account->pagewidth ) );
+   if( SizeOfList( instance->specifications ) > 0 || SizeOfList( instance->framework->specifications ) > 0 || inherited_frame_has_any_spec( instance->framework ) )
+      text_to_olc( olc, "\r\n%s", return_instance_specs( instance, socket->account->pagewidth ) );
+   if( SizeOfList( instance->stats ) > 0 )
+      text_to_olc( olc, "\r\n%s", return_instance_stats( instance, socket->account->pagewidth ) );
+   text_to_olc( olc, "\r\n" );
+   return;
+}
 
-   bprintf( buf, "%s%s%s\r\n", border, print_bar( "-", space_after_border ), border ) ;
-   if( commands )
+int editor_instance_prompt( D_SOCKET *dsock, bool commands )
+{
+   INCEPTION *olc;
+   ENTITY_INSTANCE *instance;
+   int ret = RET_SUCCESS;
+
+   if( !dsock->account || !dsock->account->olc )
    {
-      print_commands( dsock->account->olc, dsock->account->olc->editor_commands, buf, 0, dsock->account->pagewidth );
-      bprintf( buf, "\\%s/\r\n", print_bar( "-", dsock->account->pagewidth - 2 ) );
+      text_to_buffer( dsock, "Bad Prompt:>> " );
+      return ret;
    }
 
-   text_to_olc( olc, buf->data );
-   buffer_free( buf );
+   olc = dsock->account->olc;
+   instance = (ENTITY_INSTANCE *)olc->editing;
+
+   text_to_olc( olc, "Instance ID: %d | Framework ID %d ||> ", instance->tag->id, instance->framework->tag->id );
    return ret;
 }
 
@@ -1496,6 +1513,101 @@ const char *return_instance_contents_string( ENTITY_INSTANCE *instance, const ch
    DetachIterator( &Iter );
 
    buf[strlen( buf )] = '\0';
+   return buf;
+}
+
+const char *return_instance_specs( ENTITY_INSTANCE *instance, int width )
+{
+   const char *const spec_from_table[] = {
+      "", "( f )", "( i )"
+   };
+   SPECIFICATION *spec;
+   LLIST *spec_strings;
+   ITERATOR Iter;
+   char *spec_string;
+   static char buf[MAX_BUFFER];
+   int x, longest, spec_string_len, spec_from;
+   int num_column, column_count = 0;
+
+   spec_strings = AllocList();
+
+   mud_printf( buf, "%s\r\n", print_header( "Stats", "-", width ) );
+
+   for( longest = 0, x = MAX_SPEC; x >= 0; x-- )
+   {
+      spec_from = 0;
+      if( ( spec = has_spec_detailed_by_type( instance, x, &spec_from ) ) == NULL )
+         continue;
+      CREATE( spec_string, char, MAX_BUFFER );
+      mud_printf( spec_string, "%s : %d%s ", spec_table[spec->type], spec->value, spec_from_table[spec_from] );
+      if( ( spec_string_len = strlen( spec_string ) ) > longest )
+         longest = spec_string_len;
+      AttachToList( spec_string, spec_strings );
+   }
+
+   num_column = floor( (double)width / (double)longest );
+
+   AttachIterator( &Iter, spec_strings );
+   while( ( spec_string = (char *)NextInList( &Iter ) ) != NULL )
+   {
+      mudcat( buf, fit_string_to_space( spec_string, longest ) );
+      if( ++column_count >= num_column )
+      {
+         mudcat( buf, "\r\n" );
+         column_count = 0;
+      }
+   }
+   DetachIterator( &Iter );
+   if( column_count != 0 )
+      mudcat( buf, "\r\n" );
+
+   FreeList( spec_strings );
+   return buf;
+}
+
+const char *return_instance_stats( ENTITY_INSTANCE *instance, int width )
+{
+   STAT_INSTANCE *stat;
+   LLIST *stat_strings;
+   ITERATOR Iter;
+   char *stat_string;
+   static char buf[MAX_BUFFER];
+   int x, longest, stat_string_len;
+   int num_column, column_count = 0;
+
+   stat_strings = AllocList();
+
+   mud_printf( buf, "%s\r\n", print_header( "Stats", "-", width ) );
+   for( longest = 0, ( x = get_potential_id( ENTITY_STAT_FRAMEWORK_IDS ) - 1 ); x >= 0; x-- )
+   {
+      if( ( stat = get_stat_from_instance_by_id( instance, x ) ) == NULL )
+         continue;
+      if( stat == instance->primary_dmg_received_stat )
+         continue;
+      CREATE( stat_string, char, MAX_BUFFER );
+      mud_printf( stat_string, "%s - P: %d M: %d T: %d ", stat->framework->name, stat->perm_stat, stat->mod_stat, ( stat->perm_stat + stat->mod_stat ) );
+      if( ( stat_string_len = strlen( stat_string ) ) > longest )
+         longest = stat_string_len;
+      AttachToList( stat_string, stat_strings );
+   }
+
+   num_column = floor( (double)width / (double)longest );
+
+   AttachIterator( &Iter, stat_strings );
+   while( ( stat_string = (char *)NextInList( &Iter ) ) != NULL )
+   {
+      mudcat( buf, fit_string_to_space( stat_string, longest ) );
+      if( ++column_count >= num_column )
+      {
+         mudcat( buf, "\r\n" );
+         column_count = 0;
+      }
+   }
+   DetachIterator( &Iter );
+   if( column_count != 0 )
+      mudcat( buf, "\r\n" );
+
+   FreeList( stat_strings );
    return buf;
 }
 
