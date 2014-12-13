@@ -446,7 +446,11 @@ const char *return_framework_stats( ENTITY_FRAMEWORK *frame, int width )
       if( sframe == frame->f_primary_dmg_received_stat )
          continue;
       CREATE( stat_string, char, MAX_BUFFER );
-      mud_printf( stat_string, "%s%s ", sframe->name, stat_from_table[stat_from] );
+      mud_printf( stat_string, "%s%s", sframe->name, stat_from_table[stat_from] );
+      if( SizeOfList( stat_strings ) != 0 )
+         mudcat( stat_string, ", " );
+      else
+         mudcat( stat_string, " " );
       if( ( stat_string_len = strlen( stat_string ) ) > longest )
          longest = stat_string_len;
       AttachToList( stat_string, stat_strings );

@@ -631,10 +631,7 @@ void lua_set_stat( STAT_INSTANCE *stat, int change  )
    int ret, top = lua_gettop( lua_handle );
 
    if( change == 0 )
-   {
-      bug( "%s: 0 change", __FUNCTION__ );
       return;
-   }
 
    if( !s_script_exists( stat->framework ) )
       return;
