@@ -42,6 +42,17 @@ void free_element_info( ELEMENT_INFO *element )
    FREE( element );
 }
 
+void clear_eleinfo_list( LLIST *list )
+{
+   ELEMENT_INFO *info;
+   ITERATOR Iter;
+
+   AttachIterator( &Iter, list );
+   while( ( info = (ELEMENT_INFO *)NextInList( &Iter ) ) != NULL )
+      free_element_info( info );
+   DetachIterator( &Iter );
+}
+
 COMPOSITION *init_composition( void )
 {
    COMPOSITION *comp;
@@ -55,6 +66,17 @@ void free_composition( COMPOSITION *comp )
    comp->owner = NULL;
    comp->frame = NULL;
    FREE( comp );
+}
+
+void clear_comp_list( LLIST *list )
+{
+   COMPOSITION *comp;
+   ITERATOR Iter;
+
+   AttachIterator( &Iter, list );
+   while( ( comp = (COMPOSITION *)NextInList( &Iter ) ) != NULL )
+      free_composition( comp );
+   DetachIterator( &Iter );
 }
 
 /* utility */
@@ -310,6 +332,137 @@ bool get_element_from_lua_table( const char *name, lua_State *L )
    return TRUE;
 }
 
+int get_instance_element_data( ENTITY_INSTANCE *instance, const char *elename, int which )
+{
+   ELEMENT_INFO *info;
+   ITERATOR Iter;
+   int value = 0;
+
+   AttachIterator( &Iter, instance->elements );
+   while( ( info = (ELEMENT_INFO *)NextInList( &Iter ) ) != NULL )
+      if( !strcasecmp( info->frame->name, elename ) )
+         break;
+   DetachIterator( &Iter );
+
+   if( info )
+      value += get_info_data( info, which );
+   value += get_framework_element_data( instance->framework, elename, which );
+
+   return value;
+}
+
+int get_framework_element_data( ENTITY_FRAMEWORK *frame, const char *elename, int which )
+{
+   ELEMENT_INFO *info = NULL;
+   ITERATOR Iter;
+   int value = 0;
+
+   while( frame )
+   {
+      AttachIterator( &Iter, frame->elements );
+      while( ( info = (ELEMENT_INFO *)NextInList( &Iter ) ) != NULL )
+         if( !strcasecmp( info->frame->name, elename ) )
+            break;
+      DetachIterator( &Iter );
+      if( info )
+         break;
+      else if( frame->inherits )
+         frame = frame->inherits;
+      else
+         return value;
+   }
+   if( info )
+      value += get_info_data( info, which );
+   return value;
+}
+
+int get_info_data( ELEMENT_INFO *info, int which )
+{
+   switch( which )
+   {
+      default: return 0;
+      case INFO_PEN:
+         return info->pen;
+      case INFO_RES:
+         return info->res;
+      case INFO_POTENCY:
+         return info->potency;
+   }
+}
+
+void get_instance_composition( ENTITY_INSTANCE *instance, LLIST *comprised )
+{
+   ELEMENT_FRAMEWORK *eleframe;
+   COMPOSITION *comp;
+   ITERATOR Iter;
+
+   AttachIterator( &Iter, element_frameworks );
+   while( ( eleframe = (ELEMENT_FRAMEWORK *)NextInList( &Iter ) ) != NULL )
+   {
+      if( ( comp = get_composition_from_instance( instance, eleframe->name ) ) == NULL )
+         continue;
+      AttachToList( comp, comprised );
+   }
+   DetachIterator( &Iter );
+   return;
+}
+
+void get_framework_composition( ENTITY_FRAMEWORK *frame, LLIST *comprised )
+{
+   ELEMENT_FRAMEWORK *eleframe;
+   COMPOSITION *comp;
+   ITERATOR Iter;
+
+   AttachIterator( &Iter, element_frameworks );
+   while( ( eleframe = (ELEMENT_FRAMEWORK *)NextInList( &Iter ) ) != NULL )
+   {
+      if( ( comp = get_composition_from_framework( frame, eleframe->name ) ) == NULL )
+         continue;
+      AttachToList( comp, comprised );
+   }
+   DetachIterator( &Iter );
+   return;
+}
+
+COMPOSITION *get_composition_from_instance( ENTITY_INSTANCE *instance, const char *elename )
+{
+   COMPOSITION *comp;
+   ITERATOR Iter;
+
+   AttachIterator( &Iter, instance->elements );
+   while( ( comp = (COMPOSITION *)NextInList( &Iter ) ) != NULL )
+      if( !strcasecmp( comp->frame->name, elename ) )
+         break;
+   DetachIterator( &Iter );
+
+   if( !comp )
+      comp = get_composition_from_framework( instance->framework, elename );
+
+   return comp;
+}
+
+COMPOSITION *get_composition_from_framework( ENTITY_FRAMEWORK *frame, const char *elename )
+{
+   COMPOSITION *comp;
+   ITERATOR Iter;
+
+   while( frame )
+   {
+      AttachIterator( &Iter, frame->composition );
+      while( ( comp = (COMPOSITION *)NextInList( &Iter ) ) != NULL )
+         if( !strcasecmp( comp->frame->name, elename ) )
+            break;
+      DetachIterator( &Iter );
+      if( comp )
+         return comp;
+      else if( frame->inherits )
+         frame = frame->inherits;
+      else
+         break;
+   }
+   return NULL;
+}
+
 /* action */
 inline void add_composition_to_element( COMPOSITION *comp, ELEMENT_FRAMEWORK *eleframe )
 {
@@ -317,6 +470,50 @@ inline void add_composition_to_element( COMPOSITION *comp, ELEMENT_FRAMEWORK *el
    comp->ownertype = COMP_OWNER_ELEMENT;
    AttachToList( comp, eleframe->composition );
 }
+
+inline void add_composition_to_instance( COMPOSITION *comp, ENTITY_INSTANCE *instance )
+{
+   comp->owner = instance;
+   comp->ownertype = COMP_OWNER_INSTANCE;
+   AttachToList( comp, instance->composition );
+   if( !quick_query( "INSERT INTO `compositions` VALUES( 'i%d', '%s', '%d' );", instance->tag->id, comp->frame->name, comp->amount ) )
+      bug( "%s: could not insert into database new instance composition", __FUNCTION__ );
+}
+
+inline void add_composition_to_framework( COMPOSITION *comp, ENTITY_FRAMEWORK *frame )
+{
+   comp->owner = frame;
+   comp->ownertype = COMP_OWNER_FRAME;
+   AttachToList( comp, frame->composition );
+   if( !strcmp( frame->tag->created_by, "null" ) )
+      return;
+   if( !quick_query( "INSERT INTO `compositions` VALUES ( 'f%d', '%s', '%d' );", frame->tag->id, comp->frame->name, comp->amount ) )
+      bug( "%s: could not insert into database new framework composition", __FUNCTION__ );
+}
+
+void set_composition_amount( COMPOSITION *comp, int amount )
+{
+   char identifier = 'i';
+   int id;
+   comp->amount = amount;
+
+   if( !comp->owner )
+      return;
+   else if( comp->ownertype == COMP_OWNER_FRAME )
+   {
+      if( !strcmp( ((ENTITY_FRAMEWORK *)comp->owner)->tag->created_by, "null" ) )
+         return;
+       id = ((ENTITY_FRAMEWORK *)comp->owner)->tag->id;
+       identifier = 'f';
+   }
+   else if( comp->ownertype == COMP_OWNER_INSTANCE )
+      id = ((ENTITY_INSTANCE *)comp->owner)->tag->id;
+   else
+      return;
+   if( !quick_query( "UPDATE `compositions` SET amount=%d WHERE owner='%c%d' AND element='%s';", comp->amount, identifier, id, comp->frame->name ) )
+      bug( "%s: could not update database with instaces new composition amount.", __FUNCTION__ );
+}
+
 
 void print_element_list( LLIST *list )
 {

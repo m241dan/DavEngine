@@ -36,6 +36,8 @@ struct entity_instance
    LLIST *damages_sent;
    LLIST *damages_received;
    LLIST *timers;
+   LLIST *elements;
+   LLIST *composition;
    STAT_INSTANCE *primary_dmg_received_stat;
 
    ENTITY_INSTANCE *home;

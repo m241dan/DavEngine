@@ -12,6 +12,8 @@ ENTITY_FRAMEWORK *init_eFramework( void )
    frame->fixed_contents = AllocList();
    frame->specifications = AllocList();
    frame->stats = AllocList();
+   frame->elements = AllocList();
+   frame->composition = AllocList();
    if( clear_eFramework( frame ) != RET_SUCCESS )
    {
       bug( "could not clear memory allocated by %s", __FUNCTION__ );
@@ -73,6 +75,14 @@ int free_eFramework( ENTITY_FRAMEWORK *frame )
    clearlist( frame->stats );
    FreeList( frame->stats );
    frame->stats = NULL;
+
+   clear_eleinfo_list( frame->elements );
+   FreeList( frame->elements );
+   frame->elements = NULL;
+
+   clear_comp_list( frame->composition );
+   FreeList( frame->composition );
+   frame->composition = NULL;
 
    frame->inherits = NULL;
    frame->f_primary_dmg_received_stat = NULL;
