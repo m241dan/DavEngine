@@ -34,7 +34,7 @@ LLIST    * stat_frameworks = NULL;
 LLIST    * damage_queue = NULL;
 LLIST    * timer_queue = NULL;
 LLIST    * paused_timer_queue = NULL;
-
+LLIST	 * element_frameworks = NULL;
 /* server settings */
 int        MUDPORT = 0;
 
@@ -96,6 +96,7 @@ int main(int argc, char **argv)
    damage_queue = AllocList();
    timer_queue = AllocList();
    paused_timer_queue = AllocList();
+   element_frameworks = AllocList();
 
    builder_count = 0;
 
@@ -148,6 +149,7 @@ int main(int argc, char **argv)
    load_lua_command_tables();
    load_lua_misc_vars();
    load_lua_misc_funcs();
+   load_lua_element_table();
    lua_server_settings(); /* loading server stuff */
    lua_database_settings(); /* loading the sql variables */
    lua_combat_settings(); /* loading combat settings */
@@ -233,6 +235,9 @@ int main(int argc, char **argv)
    log_string( "Loading Mud Timers" );
    load_mud_timers();
    load_events( NULL );
+
+   log_string( "Loading Element Table" );
+   load_elements_table();
 /*
    log_string( "Loading Workspaces" );
    if( load_workspaces() != RET_SUCCESS )

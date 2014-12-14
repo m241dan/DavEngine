@@ -263,7 +263,13 @@ inline void load_lua_misc_vars( void )
 inline void load_lua_misc_funcs( void )
 {
    if( luaL_loadfile( lua_handle, "../scripts/settings/misc_functions.lua" ) || lua_pcall( lua_handle, 0, 0, 0 ) )
-      bug( "%s: could not load musc functions\r\n - %s", __FUNCTION__, lua_tostring( lua_handle, -1 ) );
+      bug( "%s: could not load misc functions\r\n - %s", __FUNCTION__, lua_tostring( lua_handle, -1 ) );
+}
+
+inline void load_lua_element_table( void )
+{
+   if( luaL_loadfile( lua_handle, "../scripts/settings/element_table.lua" ) || lua_pcall( lua_handle, 0, 0, 0 ) )
+      bug( "%s: could not load element table\r\n - %s", __FUNCTION__, lua_tostring( lua_handle, -1 ) );
 }
 
 void lua_server_settings( void )

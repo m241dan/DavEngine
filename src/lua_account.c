@@ -97,7 +97,7 @@ int getAccount( lua_State *L )
             bug( "%s: only takes userdata of type instance.", __FUNCTION__ );
             break;
          }
-         account = instance->account;
+         account = instance->socket->account;
          break;
    }
    if( !account )
